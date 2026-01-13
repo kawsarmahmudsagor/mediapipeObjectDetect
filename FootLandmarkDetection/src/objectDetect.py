@@ -62,8 +62,8 @@ def visualize(dataset_folder, max_examples=None):
 # ----------------------------
 # Paths
 # ----------------------------
-train_dataset_path = "/home/xr23/myenv/MediapipeObjectDetect/FootLandmarkDetection/Human-Foot-Object-Detction-6/train"
-validation_dataset_path = "/home/xr23/myenv/MediapipeObjectDetect/FootLandmarkDetection/Human-Foot-Object-Detction-6/valid"
+train_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/FootLandmarkDetection/src/Human-Foot-Object-Detction-8/train"
+validation_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/FootLandmarkDetection/src/Human-Foot-Object-Detction-8/valid"
 export_base_dir = "detection_exported_model"
 
 
@@ -83,12 +83,11 @@ print("validation_data size: ", validation_data.size)
 # ----------------------------
 hyperparams_list = [
    
-    {"batch_size":32, "epochs": 250, "learning_rate": 0.09,},
-    {"batch_size":32, "epochs": 150, "learning_rate": 0.07,},
-    
-    
-
-    
+    {"batch_size":8, "epochs": 250, "learning_rate": 0.07,},
+    {"batch_size":8, "epochs": 250, "learning_rate": 0.09,},
+    {"batch_size":16, "epochs": 250, "learning_rate": 0.09,},
+    {"batch_size":16, "epochs": 300, "learning_rate": 0.09,},
+       
 ]
 
 spec = object_detector.SupportedModels.MOBILENET_MULTI_AVG_I384

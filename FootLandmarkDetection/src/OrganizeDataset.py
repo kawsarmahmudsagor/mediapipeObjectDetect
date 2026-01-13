@@ -18,8 +18,8 @@ def move_images_to_subfolder(dataset_split_folder):
     print(f"Images moved to {images_folder}")
 
 # Example usage:
-train_dataset_path = "/home/xr23/myenv/MediapipeObjectDetect/FootLandmarkDetection/Human-Foot-Object-Detction-6/train"
-validation_dataset_path = "/home/xr23/myenv/MediapipeObjectDetect/FootLandmarkDetection/Human-Foot-Object-Detction-6/valid"
+train_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/FootLandmarkDetection/src/Human-Foot-Object-Detction-8/train"
+validation_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/FootLandmarkDetection/src/Human-Foot-Object-Detction-8/valid"
 
 move_images_to_subfolder(train_dataset_path)
 move_images_to_subfolder(validation_dataset_path)
