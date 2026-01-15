@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Foot Keypoint Detection - TFJS GraphModel</title>
+<style>
+  body { display: flex; flex-direction: column; align-items: center; font-family: Arial; }
+  canvas { border: 1px solid #ccc; margin-top: 10px; }
+  video { display: none; }
+</style>
+</head>
+<body>
+<h1>Foot Keypoint Detection (MobileNetV2 + TFJS)</h1>
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas" width="320" height="320"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const IMG_SIZE = 320;
+
+// Keypoints for feet
+const KEYPOINTS = ["big_toe","small_toe","inner_ankle","outer_ankle","heel","middle_ankle"];
+
+let graphModel;
+let inputName, outputName;
+
+// -----------------------------
+// Load TFJS GraphModel
+// -----------------------------
+async function loadGraphModel() {
+  try {
+    // Optional: Use CPU to avoid GPU memory issues
+    // await tf.setBackend('cpu');
+    // await tf.ready();
+
+    graphModel = await tf.loadGraphModel('tfjs_model/model.json'); // path to your model.json
+    console.log("GraphModel loaded!");
+
+    // Get input/output names
+    inputName = graphModel.inputs[0].name;
+    outputName = graphModel.outputs[0].name;
+
+    console.log("Model inputs:", graphModel.inputs);
+    console.log("Model outputs:", graphModel.outputs);
+  } catch (err) {
+    console.error("Error loading GraphModel:", err);
+  }
+}
+
+// -----------------------------
+// Setup camera
+// -----------------------------
+async function setupCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" },
+    audio: false
+  });
+  video.srcObject = stream;
+  return new Promise(resolve => {
+    video.onloadedmetadata = () => resolve(video);
+  });
+}
+
+// -----------------------------
+// Draw keypoints
+// -----------------------------
+function drawKeypoints(keypoints) {
+  ctx.clearRect(0, 0, IMG_SIZE, IMG_SIZE);
+  ctx.drawImage(video, 0, 0, IMG_SIZE, IMG_SIZE);
+
+  ctx.fillStyle = "red";
+  ctx.strokeStyle = "red";
+  ctx.lineWidth = 2;
+
+  for (let i = 0; i < keypoints.length; i += 2) {
+    const x = keypoints[i] * IMG_SIZE;
+    const y = keypoints[i + 1] * IMG_SIZE;
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+}
+
+// -----------------------------
+// Predict per frame
+// -----------------------------
+async function predictFrame() {
+  if (!graphModel) {
+    requestAnimationFrame(predictFrame);
+    return;
+  }
+
+  tf.tidy(() => {
+    // Convert video to tensor
+    const tfImg = tf.browser.fromPixels(video)
+      .resizeBilinear([IMG_SIZE, IMG_SIZE])
+      .toFloat()
+      .div(255.0)
+      .expandDims(0); // shape [1, IMG_SIZE, IMG_SIZE, 3]
+
+    // Run inference
+    const outputTensor = graphModel.execute({ [inputName]: tfImg }, outputName);
+
+    // Convert output tensor to array
+    const outputArray = outputTensor.dataSync(); // Float32Array
+    drawKeypoints(outputArray);
+
+    // Tensors disposed automatically by tf.tidy()
+  });
+
+  requestAnimationFrame(predictFrame);
+}
+
+// -----------------------------
+// Initialize everything
+// -----------------------------
+async function init() {
+  await loadGraphModel();
+  await setupCamera();
+  video.play();
+  predictFrame();
+}
+
+init();
+</script>
+</body>
+</html>

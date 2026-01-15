@@ -82,7 +82,7 @@ print("validation_data size: ", validation_data.size)
 # Hyperparameter Sets
 # ----------------------------
 hyperparams_list = [
-    {"batch_size":16, "epochs": 220, "learning_rate": 0.03,},
+    {"batch_size":16, "epochs": 250, "learning_rate": 0.03,},
 ]
 
 spec = object_detector.SupportedModels.MOBILENET_MULTI_AVG_I384

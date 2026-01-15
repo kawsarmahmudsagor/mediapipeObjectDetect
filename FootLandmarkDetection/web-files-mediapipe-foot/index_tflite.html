@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Foot Keypoint Detection - Webcam</title>
+<style>
+  canvas { 
+    border: 1px solid black; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+  }
+  video { 
+    display: none; /* hide raw video */
+  }
+</style>
+</head>
+<body>
+    <h2>Foot Keypoint Detection - Back Camera</h2>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite"></script>
+
+    <script>
+        const IMG_SIZE = 320;
+        const NUM_KEYPOINTS = 6; // big_toe, small_toe, inner_ankle, outer_ankle, heel, middle_ankle
+        const MODEL_INPUT_NAME = 'serving_default_input_layer:0';
+        let tfliteModel;
+
+        async function init() {
+            try {
+                tflite.setWasmPath('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite/dist/');
+                tfliteModel = await tflite.loadTFLiteModel('foot_model_4.tflite');
+                console.log("✅ TFLite model loaded:", tfliteModel);
+
+                const video = document.getElementById('video');
+                const canvas = document.getElementById('canvas');
+                const ctx = canvas.getContext('2d');
+
+                canvas.width = 640;
+                canvas.height = 480;
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: "environment" }, width: { ideal: 640 }, height: { ideal: 480 } },
+                audio: false
+                });
+                video.srcObject = stream;
+
+                video.addEventListener('loadeddata', () => {
+                console.log("✅ Camera loaded, starting inference loop...");
+                requestAnimationFrame(() => runFrame(video, canvas, ctx));
+                });
+
+            } catch (err) {
+                console.error("Error initializing TFLite model or camera:", err);
+            }
+            
+
+            let lastTime = performance.now();
+            let fps = 0;
+
+            async function runFrame(video, canvas, ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Compute video draw size & offsets
+            const videoWidth = video.videoWidth;
+            const videoHeight = video.videoHeight;
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
+
+            const videoAspect = videoWidth / videoHeight;
+            const canvasAspect = canvasWidth / canvasHeight;
+
+            let drawWidth, drawHeight, offsetX, offsetY;
+            if (canvasAspect > videoAspect) {
+                drawHeight = canvasHeight;
+                drawWidth = videoAspect * drawHeight;
+                offsetX = (canvasWidth - drawWidth) / 2;
+                offsetY = 0;
+            } else {
+                drawWidth = canvasWidth;
+                drawHeight = drawWidth / videoAspect;
+                offsetX = 0;
+                offsetY = (canvasHeight - drawHeight) / 2;
+            }
+
+            ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight);
+
+            // Preprocess frame [-1,1]
+            const tmpCanvas = document.createElement('canvas');
+            tmpCanvas.width = IMG_SIZE;
+            tmpCanvas.height = IMG_SIZE;
+            const tmpCtx = tmpCanvas.getContext('2d');
+            tmpCtx.drawImage(video, 0, 0, videoWidth, videoHeight, 0, 0, IMG_SIZE, IMG_SIZE);
+            const resizedData = tmpCtx.getImageData(0, 0, IMG_SIZE, IMG_SIZE).data;
+
+            const inputArray = new Float32Array(IMG_SIZE * IMG_SIZE * 3);
+            let j = 0;
+            for (let i = 0; i < resizedData.length; i += 4) {
+                inputArray[j++] = resizedData[i] / 127.5 - 1.0;     // R
+                inputArray[j++] = resizedData[i + 1] / 127.5 - 1.0; // G
+                inputArray[j++] = resizedData[i + 2] / 127.5 - 1.0; // B
+            }
+
+            const inputTensor = tf.tensor(inputArray, [1, IMG_SIZE, IMG_SIZE, 3], 'float32');
+            const namedInput = {};
+            namedInput[MODEL_INPUT_NAME] = inputTensor;
+
+            console.log("Model inputs:", namedInput);
+
+            // Run inference
+            const outputTensor = tfliteModel.predict(namedInput);
+            const flatOutput = await outputTensor.data();
+
+            console.log("Flat output:", flatOutput);
+
+            // Draw keypoints
+            ctx.fillStyle = 'red';
+            ctx.strokeStyle = 'yellow';
+            ctx.lineWidth = 2;
+
+            for (let i = 0; i < NUM_KEYPOINTS; i++) {
+                const x_norm = flatOutput[i * 2];     // normalized [0,1]
+                const y_norm = flatOutput[i * 2 + 1]; // normalized [0,1]
+                const px = x_norm * drawWidth + offsetX;
+                const py = y_norm * drawHeight + offsetY;
+
+                ctx.beginPath();
+                ctx.arc(px, py, 5, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+
+            // FPS monitoring
+            const now = performance.now();
+            fps = 1000 / (now - lastTime);
+            lastTime = now;
+            ctx.fillStyle = 'lime';
+            ctx.font = '20px Arial';
+            ctx.fillText(`FPS: ${fps.toFixed(1)}`, 10, 25);
+
+            requestAnimationFrame(() => runFrame(video, canvas, ctx));
+            }
+    }
+
+    // Initialize everything
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Foot Keypoint Detection - Webcam</title>
+<style>
+  canvas { 
+    border: 1px solid black; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+  }
+  video { 
+    display: none;
+  }
+</style>
+</head>
+<body>
+    <h2>Foot Keypoint Detection - Back Camera</h2>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite"></script>
+
+    <script>
+        const IMG_SIZE = 320;
+
+        const keypointNames = [
+            "big_toe",
+            "small_toe",
+            "inner_ankle",
+            "outer_ankle",
+            "heel",
+            "middle_ankle"
+        ];
+
+        const VALUES_PER_KEYPOINT = 3; // x, y, visibility
+        const MODEL_INPUT_NAME = 'serving_default_input_layer:0';
+
+        let tfliteModel;
+
+        async function init() {
+            try {
+                tflite.setWasmPath('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite/dist/');
+                tfliteModel = await tflite.loadTFLiteModel('foot-latest-36-dim.tflite');
+                console.log("✅ TFLite model loaded.");
+
+                const video = document.getElementById('video');
+                const canvas = document.getElementById('canvas');
+                const ctx = canvas.getContext('2d');
+
+                canvas.width = 640;
+                canvas.height = 480;
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: "environment" }, width: 640, height: 480 },
+                    audio: false
+                });
+                video.srcObject = stream;
+
+                video.addEventListener('loadeddata', () => {
+                    console.log("Camera ready. Starting inference...");
+                    requestAnimationFrame(() => runFrame(video, canvas, ctx));
+                });
+            } catch (err) {
+                console.error("Initialization error:", err);
+            }
+        }
+
+        let lastTime = performance.now();
+
+        async function runFrame(video, canvas, ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            const cw = canvas.width;
+            const ch = canvas.height;
+
+            const videoAspect = vw / vh;
+            const canvasAspect = cw / ch;
+
+            let dw, dh, ox, oy;
+
+            if (canvasAspect > videoAspect) {
+                dh = ch;
+                dw = videoAspect * dh;
+                ox = (cw - dw) / 2;
+                oy = 0;
+            } else {
+                dw = cw;
+                dh = dw / videoAspect;
+                ox = 0;
+                oy = (ch - dh) / 2;
+            }
+
+            ctx.drawImage(video, ox, oy, dw, dh);
+
+            // Preprocess image to [-1,1]
+            const tempCanvas = document.createElement("canvas");
+            tempCanvas.width = IMG_SIZE;
+            tempCanvas.height = IMG_SIZE;
+            const tctx = tempCanvas.getContext("2d");
+            tctx.drawImage(video, 0, 0, vw, vh, 0, 0, IMG_SIZE, IMG_SIZE);
+
+            const imgData = tctx.getImageData(0, 0, IMG_SIZE, IMG_SIZE).data;
+            const inputArr = new Float32Array(IMG_SIZE * IMG_SIZE * 3);
+            let j = 0;
+            for (let i = 0; i < imgData.length; i += 4) {
+                inputArr[j++] = imgData[i] / 127.5 - 1;
+                inputArr[j++] = imgData[i + 1] / 127.5 - 1;
+                inputArr[j++] = imgData[i + 2] / 127.5 - 1;
+            }
+
+            const inputTensor = tf.tensor(inputArr, [1, IMG_SIZE, IMG_SIZE, 3], "float32");
+            const modelInput = {};
+            modelInput[MODEL_INPUT_NAME] = inputTensor;
+
+            const out = tfliteModel.predict(modelInput);
+            const output = await out.data();  // Float32Array length 36
+
+            // --- Map to keypoints safely ---
+            const frameKeypoints = [];
+            const halfLen = output.length / 2;
+            for (let i = 0; i < keypointNames.length; i++) {
+                const baseIdx = i * VALUES_PER_KEYPOINT;
+
+                // Average the two sets of outputs (36 = 6*3*2)
+                const x1 = output[baseIdx];
+                const y1 = output[baseIdx + 1];
+                const v1 = output[baseIdx + 2];
+                const x2 = output[baseIdx + VALUES_PER_KEYPOINT * keypointNames.length];
+                const y2 = output[baseIdx + 1 + VALUES_PER_KEYPOINT * keypointNames.length];
+                const v2 = output[baseIdx + 2 + VALUES_PER_KEYPOINT * keypointNames.length];
+
+                const x = (x1 + x2) / 2;
+                const y = (y1 + y2) / 2;
+                const v = (v1 + v2) / 2;
+
+                frameKeypoints.push({name: keypointNames[i], x, y, v});
+            }
+
+            // Draw keypoints
+            ctx.lineWidth = 2;
+            for (let i = 0; i < frameKeypoints.length; i++) {
+                const kp = frameKeypoints[i];
+                if (kp.v < 0.05) continue;
+
+                const px = kp.x * dw + ox;
+                const py = kp.y * dh + oy;
+
+                ctx.fillStyle = "red";
+                ctx.beginPath();
+                ctx.arc(px, py, 5, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.fillStyle = "yellow";
+                ctx.font = "14px Arial";
+                ctx.fillText(kp.name, px + 6, py - 6);
+            }
+
+            // FPS display
+            const now = performance.now();
+            const fps = 1000 / (now - lastTime);
+            lastTime = now;
+            ctx.fillStyle = "lime";
+            ctx.font = "20px Arial";
+            ctx.fillText(`FPS: ${fps.toFixed(1)}`, 10, 25);
+
+            requestAnimationFrame(() => runFrame(video, canvas, ctx));
+        }
+
+        init();
+    </script>
+</body>
+</html>

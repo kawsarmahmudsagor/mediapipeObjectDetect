@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Foot Detection + Keypoint Detection</title>
+  <style>
+    canvas { border: 1px solid black; position: absolute; top: 0; left: 0; }
+    video { display: none; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite"></script>
+</head>
+<body>
+  <h2>Foot Detection + Keypoint Detection</h2>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import { FilesetResolver, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision";
+
+    const IMG_SIZE = 320;
+    const NUM_KEYPOINTS = 6;
+    const VALUES_PER_KEYPOINT = 3; // x,y,visibility
+    const MODEL_INPUT_NAME = 'serving_default_input_layer:0';
+
+    let tfliteModel = null;
+    let objectDetector = null;
+
+    async function init() {
+      // 1. Load MediaPipe Wasm & ObjectDetector
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+      );
+
+      objectDetector = await ObjectDetector.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: "foot-object-detection.tflite" }, // use your working foot detector
+        runningMode: "VIDEO",
+        scoreThreshold: 0.4
+      });
+      console.log("✅ MediaPipe ObjectDetector initialized");
+
+      // 2. Load TFLite keypoint model
+      tflite.setWasmPath('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite/dist/');
+      tfliteModel = await tflite.loadTFLiteModel('foot-model-v.tflite'); // your keypoint model
+      console.log("✅ TFLite keypoint model loaded");
+
+      startVideo();
+    }
+
+    function startVideo() {
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 640;
+      canvas.height = 480;
+
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false })
+        .then(stream => {
+          video.srcObject = stream;
+          video.onloadeddata = () => {
+            video.play();
+            requestAnimationFrame(() => runFrame(video, canvas, ctx));
+          };
+        })
+        .catch(err => console.error("Error accessing camera:", err));
+    }
+
+    async function runFrame(video, canvas, ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // 1. Detect all feet
+      const detectionResult = await objectDetector.detectForVideo(video, performance.now());
+      if (detectionResult.detections.length > 0) {
+        for (let det of detectionResult.detections) {
+          const box = det.boundingBox;
+          const x_min = box.originX;
+          const y_min = box.originY;
+          const bbox_w = box.width;
+          const bbox_h = box.height;
+
+          // 2. Crop foot region
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = IMG_SIZE;
+          tempCanvas.height = IMG_SIZE;
+          const tctx = tempCanvas.getContext('2d');
+          tctx.drawImage(video, x_min, y_min, bbox_w, bbox_h, 0, 0, IMG_SIZE, IMG_SIZE);
+
+          // 3. Preprocess for TFLite
+          const imgData = tctx.getImageData(0,0,IMG_SIZE,IMG_SIZE).data;
+          const inputArr = new Float32Array(IMG_SIZE*IMG_SIZE*3);
+          let j = 0;
+          for (let i = 0; i < imgData.length; i += 4) {
+            inputArr[j++] = imgData[i]/127.5 - 1;
+            inputArr[j++] = imgData[i+1]/127.5 - 1;
+            inputArr[j++] = imgData[i+2]/127.5 - 1;
+          }
+          const inputTensor = tf.tensor(inputArr, [1, IMG_SIZE, IMG_SIZE, 3], 'float32');
+          const modelInput = {};
+          modelInput[MODEL_INPUT_NAME] = inputTensor;
+
+          // 4. Predict keypoints
+          const out = tfliteModel.predict(modelInput);
+          const output = await out.data(); // length = NUM_KEYPOINTS*3
+
+          // 5. Draw bounding box
+          ctx.strokeStyle = 'lime';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x_min, y_min, bbox_w, bbox_h);
+
+          // 6. Draw keypoints
+          for (let i = 0; i < NUM_KEYPOINTS; i++) {
+            const x = output[i*3];
+            const y = output[i*3+1];
+            const v = output[i*3+2];
+            if (v === 0) continue;
+            const px = x_min + x*bbox_w;
+            const py = y_min + y*bbox_h;
+            ctx.fillStyle = v === 1 ? 'orange' : 'red';
+            ctx.beginPath();
+            ctx.arc(px, py, 5, 0, Math.PI*2);
+            ctx.fill();
+          }
+        }
+      }
+
+      requestAnimationFrame(() => runFrame(video, canvas, ctx));
+    }
+
+    init();
+  </script>
+</body>
+</html>
