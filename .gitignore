@@ -1,3 +1,5 @@
 logoDetection/src/Logo_detection-5/
 # Python virtual environments
 logoDetection/.venv/
+skyDetection/.venv/
+FootLandmarkDetection/src/.venv

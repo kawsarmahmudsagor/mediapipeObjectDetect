@@ -62,8 +62,8 @@ def visualize(dataset_folder, max_examples=None):
 # ----------------------------
 # Paths
 # ----------------------------
-train_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-5/train"
-validation_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-5/valid"
+train_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-6/train"
+validation_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-6/valid"
 export_base_dir = "logo_detection_model"
 
 
@@ -82,10 +82,7 @@ print("validation_data size: ", validation_data.size)
 # Hyperparameter Sets
 # ----------------------------
 hyperparams_list = [
-    {"batch_size":16, "epochs": 200, "learning_rate": 0.07,},
-    {"batch_size":16, "epochs": 150, "learning_rate": 0.07,},
-    {"batch_size":16, "epochs": 200, "learning_rate": 0.09,},
-    {"batch_size":16, "epochs": 150, "learning_rate": 0.09,},
+    {"batch_size":16, "epochs": 200, "learning_rate": 0.05,},
 ]
 
 spec = object_detector.SupportedModels.MOBILENET_MULTI_AVG_I384
