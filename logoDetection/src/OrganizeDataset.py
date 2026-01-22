@@ -16,8 +16,8 @@ def move_images_to_subfolder(dataset_split_folder):
     print(f"Images moved to {images_folder}")
 
 # Example usage:
-train_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-10/train"
-validation_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-10/valid"
+train_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-12/train"
+validation_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-12/valid"
 
 move_images_to_subfolder(train_dataset_path)
 move_images_to_subfolder(validation_dataset_path)

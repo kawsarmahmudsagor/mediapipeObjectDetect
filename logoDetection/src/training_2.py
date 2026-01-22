@@ -63,9 +63,9 @@ def visualize(dataset_folder, max_examples=None):
 # ----------------------------
 # Paths
 # ----------------------------
-train_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-10/train"
-validation_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-10/valid"
-export_base_dir = "mobilenet_v2_320_model_1"
+train_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-12/train"
+validation_dataset_path = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/Logo_detection-12/valid"
+export_base_dir = "mobilenet_v2_320_model_2"
 
 
 # Visualize some examples
@@ -83,10 +83,7 @@ print("validation_data size: ", validation_data.size)
 # Hyperparameter Sets
 # ----------------------------
 hyperparams_list = [
-    {"batch_size":16, "epochs": 200, "learning_rate": 0.07},
-    {"batch_size":8, "epochs": 200, "learning_rate": 0.07},
-    {"batch_size":8, "epochs": 150, "learning_rate": 0.04},
-    {"batch_size":8, "epochs": 200, "learning_rate": 0.9},
+    {"batch_size":16, "epochs": 200, "learning_rate": 0.08},
 ]
 
 spec = object_detector.SupportedModels.MOBILENET_V2_I320
@@ -136,7 +133,7 @@ for i, hparam_set in enumerate(hyperparams_list, start=1):
 
     # -------------------- Output directory --------------------
     # -------------------- Output directory --------------------
-    OUTPUT_DIR = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/mobilenet_v2_320_model_1"
+    OUTPUT_DIR = "/home/sagor/Projects/mediapipeObjectDetect/logoDetection/src/mobilenet_v2_320_model_2"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # -------------------- Quantization config --------------------
